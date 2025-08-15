@@ -4,8 +4,8 @@ const Product = require('../models/productModel')
 exports.addProduct= async (req,res)=>{
         const {name,price,image,SKU,description} = req.body
         try {
-            if (!name) return res.status(400).json({message:'please include Product details'})
-                const product=await Product.findOne({SKU})
+            if (!name|| !price|| !SKU) return res.status(400).json({message:'please include Product details'})
+                let product=await Product.findOne({SKU})
             if (product) return res.status(400).json({message: 'this product already exists'})
             product= new Product({
                 name:name,
@@ -23,11 +23,11 @@ exports.addProduct= async (req,res)=>{
 }
 
 exports.removeProduct=async(req,res)=>{
-    const {SKU}=req.body
+    const {SKU}=req.params
     try {
         if(!SKU) return res.status(400).json({message:'please enter store keeping unit'})
             let product= await Product.findOneAndDelete({SKU})
-        if (!product)return res.status(400).json({message:"product doesn't exist"})
+        if (!product)return res.status(404).json({message:"product doesn't exist"})
         
         return res.status(200).json({message: "product deleted successfully"})
         
@@ -37,6 +37,37 @@ exports.removeProduct=async(req,res)=>{
     }
 }
 
+exports.updateProduct = async (req, res) => {
+    const { SKU } = req.params;
+    const { name, price, image, description } = req.body;
+
+    try {
+        if (!SKU) {
+            return res.status(400).json({  message: 'Please provide SKU' });
+        }
+
+        let product = await Product.findOne({ SKU });
+        if (!product) {
+            return res.status(404).json({  message: "Product doesn't exist" });
+        }
+
+        if (name) product.name = name;
+        if (price) product.price = price;
+        if (image) product.image = image;
+        if (description) product.description = description;
+
+        await product.save();
+
+        return res.status(200).json({message: 'Product updated successfully', data: product });
+
+    } catch (error) {
+        return res.status(500).json({error: error.message });
+    }
+};
+
+
+
+//non admin routes
 exports.getAllProducts= async(req,res)=>{
     try {
        const products=await Product.find()
@@ -50,7 +81,6 @@ exports.getProduct= async (req,res) => {
     try {
         
     const {SKU}= req.params
-    if (!SKU) return res.status(400).json({message:" please input store keeping unit"})
         const product = await Product.findOne({SKU})
     if(!product)return res.status(404).json({message:"product doesnt exist"})
         return res.status(200).json({success:true, product})

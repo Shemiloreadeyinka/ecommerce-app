@@ -1,5 +1,7 @@
 const Cart = require('../models/cartModel')
 const Product = require('../models/productModel')
+const Order = require('../models/ordersModel');
+
 
 exports.addProductToCart = async (req, res) => {
     const { id } = req.user
@@ -84,3 +86,57 @@ exports.GetUserCart = async (req, res) => {
     }
 
 }
+
+exports.clearCart = async (req, res) => {
+    const { id } = req.user;
+
+    try {
+        const cart = await Cart.findOne({ user: id });
+        if (!cart) return res.status(404).json({  message: 'Cart not found' });
+
+        cart.products = [];
+        await cart.save();
+
+        return res.status(200).json({ message: 'Cart cleared', cart });
+    } catch (error) {
+        return res.status(500).json({  error: error.message });
+    }
+};
+
+
+exports.checkoutCart = async (req, res) => {
+    const { id } = req.user;
+    const { shippingAddress } = req.body;
+
+    try {
+        const cart = await Cart.findOne({ user: id }).populate('products.product');
+        if (!cart || cart.products.length === 0) {
+            return res.status(400).json({ success: false, message: 'Cart is empty' });
+        }
+
+        // Calculate total amount
+        const totalAmount = cart.products.reduce((total, item) => total + item.totalPrice, 0);
+
+        // Create order
+        const order = new Order({
+            user: id,
+            products: cart.products.map(p => ({
+                product: p.product._id,
+                quantity: p.quantity,
+                unitPrice: p.unitPrice,
+                totalPrice: p.totalPrice
+            })),
+            totalAmount,
+            status: 'Pending',
+            shippingAddress
+        });
+        await order.save();
+
+        cart.products = [];
+        await cart.save();
+
+        return res.status(201).json({  message: 'Checkout successful', order });
+    } catch (error) {
+        return res.status(500).json({  error: error.message });
+    }
+};

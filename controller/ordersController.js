@@ -2,7 +2,7 @@ const Order = require('../models/ordersModel')
 const Cart = require('../models/cartModel');
 const { v4: uuidv4 } = require('uuid'); // for unique order numbers
 
-// 🛒 CUSTOMER CONTROLLERS
+// CUSTOMER CONTROLLERS
 exports.createOrder = async (req, res) => {
 
     try {
@@ -12,7 +12,6 @@ exports.createOrder = async (req, res) => {
             return res.status(400).json({ message: 'Your cart is empty' });
         }
 
-        // Calculate total amount from cart items
         const totalAmount = cart.products.reduce((total, item) => {
             return total + (item.productid.price * item.quantity);
         }, 0) + cart.shippingFee;
@@ -79,7 +78,7 @@ exports.trackOrder = async (req, res) => {
     }
 };
 
-// 🛠️ ADMIN CONTROLLERS
+//  ADMIN CONTROLLERS
 exports.getAllOrders = async (req, res) => {
     try {
         const orders = await Order.find().populate('user').populate('products.productid');
