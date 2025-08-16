@@ -44,7 +44,7 @@ cart.products[productIndex].quantity += quantity||1;
 
 exports.removeProductFromCart = async (req, res) => {
     const { id } = req.user
-    const { productid } = req.body
+    const { productid } = req.params
     try {
         if (!productid) return res.status(400).json({ message: "input product id please" })
 

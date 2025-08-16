@@ -1,4 +1,3 @@
-const { findOneAndDelete } = require('../models/cartModel')
 const Product = require('../models/productModel')
 
 exports.addProduct= async (req,res)=>{

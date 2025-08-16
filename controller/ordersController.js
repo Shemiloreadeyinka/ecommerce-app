@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid'); // for unique order numbers
 
 // CUSTOMER CONTROLLERS
 exports.createOrder = async (req, res) => {
-
+        const { address, shippingFee } = req.body;
     try {
         const cart = await Cart.findOne({ user: req.user.id }).populate('products.productid');
 
@@ -14,65 +14,71 @@ exports.createOrder = async (req, res) => {
 
         const totalAmount = cart.products.reduce((total, item) => {
             return total + (item.productid.price * item.quantity);
-        }, 0) + cart.shippingFee;
+        }, 0) + (shippingFee || cart.shippingFee || 0);
 
 
         const order = new Order({
             user: req.user.id,
             orderNumber: uuidv4().split('-')[0], // short unique id
             address,
-            products,
+            products : cart.products,
             shippingFee,
             totalAmount
         });
 
         await order.save();
-        res.status(201).json(order);
+      return  res.status(201).json(order);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.getMyOrders = async (req, res) => {
+    const {id}= req.user
     try {
-        const orders = await Order.find({ user: req.user.id }).populate('products.productid');
-        res.json(orders);
+        const orders = await Order.find({user: id}).populate('products.productid');
+      return  res.status(201).json({message:'successful',orders});
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.getOrderById = async (req, res) => {
+        const {id}= req.user
+        const {_id}= req.params
+
     try {
-        const order = await Order.findOne({ _id: req.params.id, user: req.user.id })
+        const order = await Order.findOne({ id, _id})
             .populate('products.productid');
         if (!order) return res.status(404).json({ message: 'Order not found' });
-        res.json(order);
+      return  res.status(201).json({message:'successful', order});
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.cancelOrder = async (req, res) => {
+
     try {
-        const order = await Order.findOne({ _id: req.params.id, user: req.user.id });
+        const order = await Order.findOne({ _id: req.params._id, user: req.user.id });
         if (!order) return res.status(404).json({ message: 'Order not found' });
         if (order.status !== 'Pending') {
             return res.status(400).json({ message: 'Order cannot be cancelled' });
         }
         order.status = 'Cancelled';
         await order.save();
-        res.json(order);
+       return res.status(200).json({message:'successful',cancelledOrder: order});
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.trackOrder = async (req, res) => {
+
     try {
-        const order = await Order.findOne({ _id: req.params.id, user: req.user.id });
+        const order = await Order.findOne({ _id: req.params._id, user: req.user.id });
         if (!order) return res.status(404).json({ message: 'Order not found' });
-        res.json({ status: order.status });
+       return res.status(200).json({ status: order.status });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -82,56 +88,61 @@ exports.trackOrder = async (req, res) => {
 exports.getAllOrders = async (req, res) => {
     try {
         const orders = await Order.find().populate('user').populate('products.productid');
-        res.json(orders);
+       return res.status(200).json({message:'successful', orders});
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.getOrdersByUser = async (req, res) => {
+    const {id}= req.params
     try {
-        const orders = await Order.find({ user: req.params.userId })
+        const orders = await Order.find({user:id })
             .populate('products.productid');
-        res.json(orders);
+      return  res.status(200).json({message:'successful',orders});
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.updateOrderStatus = async (req, res) => {
+    const {orderid}= req.params
     try {
         const { status } = req.body;
-        const order = await Order.findById(req.params.id);
+        const order = await Order.findById(orderid);
         if (!order) return res.status(404).json({ message: 'Order not found' });
         order.status = status;
         await order.save();
-        res.json(order);
+       return res.status(200).json({message:'successful',order});
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.updateShipping = async (req, res) => {
+    const {orderid}=req.params
     try {
         const { address, shippingFee } = req.body;
-        const order = await Order.findById(req.params.id);
+        const order = await Order.findById(orderid);
         if (!order) return res.status(404).json({ message: 'Order not found' });
 
         if (address) order.address = address;
         if (shippingFee) order.shippingFee = shippingFee;
 
         await order.save();
-        res.json(order);
+        return res.status(200).json({message:'successful',order});
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
 
 exports.deleteOrder = async (req, res) => {
+            const {orderid}=req.params
+
     try {
-        const order = await Order.findByIdAndDelete(req.params.id);
+        const order = await Order.findByIdAndDelete(orderid);
         if (!order) return res.status(404).json({ message: 'Order not found' });
-        res.json({ message: 'Order deleted' });
+        return res.status(200).json({ message: 'Order deleted',order });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
