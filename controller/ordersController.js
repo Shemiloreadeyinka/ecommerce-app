@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid'); // for unique order numbers
 
 // CUSTOMER CONTROLLERS
 exports.createOrder = async (req, res) => {
-        const { address, shippingFee } = req.body;
+        const { address } = req.body;
     try {
         const cart = await Cart.findOne({ user: req.user.id }).populate('products.productid');
 
@@ -48,7 +48,7 @@ exports.getOrderById = async (req, res) => {
         const {_id}= req.params
 
     try {
-        const order = await Order.findOne({ id, _id})
+        const order = await Order.findOne({ _id, user:id})
             .populate('products.productid');
         if (!order) return res.status(404).json({ message: 'Order not found' });
       return  res.status(201).json({message:'successful', order});

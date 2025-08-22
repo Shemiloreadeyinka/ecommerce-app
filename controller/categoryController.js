@@ -17,21 +17,20 @@ exports.addCategory = async (req, res) => {
 
 
 }
-
 exports.getCategory = async (req, res) => {
-    let { name } = req.params
-        name= name?.trim().toLowerCase()|| null
+    const { id } = req.params;
     try {
-        if (!name) return res.status(400).json({ message: "name required" })
-        let category = await Category.findOne({name})
-        if (!category) return res.status(404).json({ message: "category doesn't exist" })
-        return res.status(200).json({ message: "category retrieved", category })
+        if (!id) return res.status(400).json({ message: "Category ID required" });
+        let category = await Category.findById(id);
+        if (!category) return res.status(404).json({ message: "Category doesn't exist" });
+        return res.status(200).json({ message: "Category retrieved", category });
     } catch (error) {
-        return res.status(500).json({ error: error.message })
+        return res.status(500).json({ error: error.message });
     }
+};
 
 
-}
+
 exports.getAllCategories = async (req, res) => {
     try {
         let categories = await Category.find()
@@ -45,14 +44,12 @@ exports.getAllCategories = async (req, res) => {
 }
 
 exports.deleteCategory= async (req,res) => {
-    let {name} = req.params
-            name= name?.trim().toLowerCase()|| null
+    let {id} = req.params
 
     try {
-        if (!name) return res.status(400).json({message:"Category name required please"})
-        const deletedCategory= await Category.findOneAndDelete({name})
-        if (!deletedCategory) return res.status(404).json({message: "category doesn't exist"})
-        return res.status(200).json({message: "category successfully deleted", deletedCategory})
+        const deletedCategory = await Category.findByIdAndDelete(id)
+        if (!deletedCategory) return res.status(404).json({ message: "category doesn't exist" })
+        return res.status(200).json({ message: "category successfully deleted", deletedCategory })
     } catch (error) {
                 return res.status(500).json({ error: error.message })
 

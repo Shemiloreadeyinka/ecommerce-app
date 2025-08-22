@@ -128,7 +128,7 @@ exports.checkoutCart = async (req, res) => {
             })),
             totalAmount,
             status: 'Pending',
-            shippingAddress
+            shippingAddress: shippingAddress || 'Not provided'
         });
         await order.save();
 

@@ -30,12 +30,12 @@ exports.login = async (req, res) => {
 
         const token = jwt.sign(
             { id: user._id },
-            process.env.JWT_TOKEN,
+            process.env.JWT_SECRET,
             { expiresIn: '1h' }
 
         )
         res.cookie('token', token, { httpOnly: true })
-        return res.status(200).json({ message: 'login successful' })
+        return res.status(200).json({ message: 'login successful' , user})
     } catch (error) {
         return res.status(500).json({ error: error.message })
 
@@ -45,7 +45,7 @@ exports.getOneUser = async (req, res) => {
     const { id } = req.params
     try {
         const user = await User.findById(id).populate('cart').populate('orders')
-        if (!user) return res.status(400).json({ message: 'user doesnt exist' })
+        if (!user) return res.status(404).json({ message: 'user doesnt exist' })
         return res.status(200).json({ message: 'successful', user })
 
     } catch (error) {
@@ -54,7 +54,7 @@ exports.getOneUser = async (req, res) => {
 }
 
 
-exports.getallUsers = async (req, res) => {
+exports.getAllUsers = async (req, res) => {
     try {
         const users = await User.find().populate('orders').populate('cart')
 

@@ -6,9 +6,9 @@ const Authorization =require('../middleware/adminMiddleware')
 
 
 router.post('/', authentication,addCategory)
-router.get('/:name', authentication,getCategory)
-router.get('/', authentication,Authorization,getAllCategories)
-router.delete('/:name', authentication,Authorization,deleteCategory)
+router.get('/:id', authentication,getCategory)
+router.get('/', authentication,getAllCategories)
+router.delete('/:id', authentication,Authorization,deleteCategory)
 router.patch('/:name', authentication,Authorization,updateCategory)
 
 module.exports = router;
