@@ -2,6 +2,7 @@ const mongoose= require("mongoose")
 
 const userSchema=new mongoose.Schema({
     name :{type: String , required: true },
+    pfp:{type: String, required: true , public_id: String},
     email:{type:String , required:true,lowercase:true , unique: true},
     cart:{type: mongoose.Schema.Types.ObjectId,ref:'Cart'},
     orders:[{type: mongoose.Schema.Types.ObjectId,ref:'Order'}],

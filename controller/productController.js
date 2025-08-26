@@ -1,139 +1,124 @@
-const Cart = require('../models/cartModel')
-const Product = require('../models/productModel')
-const Order = require('../models/ordersModel');
+const Product = require("../models/productModel");
+const cloudinary = require('cloudinary').v2;
+const fs = require("fs/promises")
 
-exports.addProductToCart = async (req, res) => {
-    const { id } = req.user
-    const { productid, quantity } = req.body
-    try {
-        if (!productid) return res.status(400).json({ message: 'product id required' })
-        if (quantity !== undefined && (isNaN(quantity) || quantity <= 0)) {
-            return res.status(400).json({ message: 'Quantity must be a positive number' })
-        }
-        const product = await Product.findById(productid)
-        if (!product) return res.status(400).json({ message: "product doesn't exist" })
-        const price = product.price
-        let cart = await Cart.findOne({user: id })
-        if (!cart) {
-             cart = new Cart({
-                user:id,
-                products: [{
-                    product:productid,
-                    quantity: quantity || 1,
-                    unitPrice: price,
-                    totalPrice: price * (quantity || 1)
-                }]
-            });
-        }
-        else {
-            const productIndex = cart.products.findIndex(p => p.product.toString() === productid);
 
-            if (productIndex > -1) {
-                cart.products[productIndex].quantity += quantity||1;
-                cart.products[productIndex].totalPrice = price * cart.products[productIndex].quantity;
-            } else {
-                cart.products.push({ product:productid, quantity: quantity || 1,unitPrice: price,totalPrice: price * (quantity || 1)});
-            }
-        }
-        await cart.save()
-        return res.status(200).json({ message: "product successfully added to cart" })
-    } catch (error) {
-        return res.status(500).json({ error: error.message })
+const dotenv = require('dotenv');
+dotenv.config();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
+});
+
+exports.addProduct = async (req, res) => {
+  try {
+    const { name, SKU, price, description, category } = req.body;
+
+    if (!name || !SKU || !price || !description || !category) {
+      return res.status(400).json({ message: "All fields are required" });
     }
-}
 
-exports.removeProductFromCart = async (req, res) => {
-    const { id } = req.user
-    const { productid } = req.params
-    try {
-        if (!productid) return res.status(400).json({ message: "input product id please" })
-
-        let cart = await Cart.findOne({ user: id })
-        if (!cart) return res.status(404).json({ message: "User has no cart" })
-
-        const productIndex = cart.products.findIndex(
-            (p) => {
-                const prodId = p.product._id ? p.product._id : p.product;
-                return prodId.toString() === productid
-            }
-        );
-
-        if (productIndex === -1) {
-            return res.status(404).json({ message: "Product not found in cart" });
-        }
-
-        cart.products.splice(productIndex, 1);
-
-        await cart.save();
-
-        res.json({ message: "Product removed from cart", cart });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
+    const existingProduct = await Product.findOne({ SKU });
+    if (existingProduct) {
+      return res.status(400).json({ message: "SKU already exists" });
     }
-}
+    let imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      const results = await Promise.all(
+        req.files.map(file =>
+          cloudinary.uploader.upload(file.path, { folder: 'uploads' })
+        )
+      );
+      await Promise.all(req.files.map(file => fs.unlink(file.path)));
 
-exports.GetUserCart = async (req, res) => {
-    const { id } = req.user
-    try {
-        const cart = await Cart.findOne({ user: id }).populate('user', 'name').populate('products.product', 'name SKU')
-        if (!cart) return res.status(404).json({ message: "user has no cart" })
-        return res.status(200).json({ cart })
-    } catch (error) {
-        return res.status(500).json({ error: error.message })
+      imageUrls = results.map(result => ({ url: result.secure_url, public_id: result.public_id }));
+    } else {
+      imageUrls = [{ url: "https://via.placeholder.com/300x300.png?text=No+Image", public_id: "placeholder" }];
     }
-}
 
-exports.clearCart = async (req, res) => {
-    const { id } = req.user;
 
-    try {
-        const cart = await Cart.findOne({ user: id });
-        if (!cart) return res.status(404).json({  message: 'Cart not found' });
 
-        cart.products = [];
-        await cart.save();
 
-        return res.status(200).json({ message: 'Cart cleared', cart });
-    } catch (error) {
-        return res.status(500).json({  error: error.message });
-    }
+    const newProduct = new Product({
+      name,
+      SKU,
+      price,
+      description,
+      image: imageUrls,
+      category,
+    });
+
+    await newProduct.save();
+
+return res.status(201).json({ message: "Product created successfully", product: newProduct });
+  } catch (error) {
+    return res.status(500).json({ message: "Error creating product", error: error.message });
+  }
 };
 
-exports.checkoutCart = async (req, res) => {
-    const { id } = req.user;
-    const { shippingAddress } = req.body;
+exports.updateProduct = async (req, res) => {
+  try {
+    const { SKU } = req.params;
+    const updates = { ...req.body };
 
-    try {
-        const cart = await Cart.findOne({ user: id }).populate('products.product');
-        if (!cart || cart.products.length === 0) {
-            return res.status(400).json({ success: false, message: 'Cart is empty' });
-        }
-
-        // Calculate total amount
-        const totalAmount = cart.products.reduce((total, item) => total + item.totalPrice, 0);
-
-        // Create order
-        const order = new Order({
-            user: id,
-            products: cart.products.map(p => ({
-                product: p.product._id,
-                quantity: p.quantity,
-                unitPrice: p.unitPrice,
-                totalPrice: p.totalPrice
-            })),
-            totalAmount,
-            status: 'Pending',
-            shippingAddress: shippingAddress || 'Not provided'
-        });
-        await order.save();
-
-        cart.products = [];
-        await cart.save();
-
-        return res.status(201).json({  message: 'Checkout successful', order });
-    } catch (error) {
-        return res.status(500).json({  error: error.message });
+    const product = await Product.findOne({ SKU });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
+
+    if (req.files && req.files.length > 0) {
+      await Promise.all(
+        product.image.map(img => {
+          if (img.public_id !== "placeholder") { 
+            return cloudinary.uploader.destroy(img.public_id);
+          }
+        })
+      );
+
+      const results = await Promise.all(
+        req.files.map(file =>
+          cloudinary.uploader.upload(file.path, { folder: "uploads" })
+        )
+      );
+
+      await Promise.all(req.files.map(file => fs.unlink(file.path)));
+
+      updates.image = results.map(result => ({
+        url: result.secure_url,
+        public_id: result.public_id
+      }));
+    }
+
+    const updatedProduct = await Product.findOneAndUpdate(
+      { SKU },
+      updates,
+      { new: true }
+    );
+
+    return res.json({ message: "Product updated successfully", product: updatedProduct });
+  } catch (error) {
+    return res.status(500).json({ message: "Error updating product", error: error.message });
+  }
+};
+
+
+exports.removeProduct = async (req, res) => {
+  try {
+    const { SKU } = req.params;
+    const product = await Product.findOneAndDelete({ SKU });
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    await Promise.all(
+      product.image.map(img => cloudinary.uploader.destroy(img.public_id))
+    );
+
+    return res.json({ message: "Product deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Error deleting product", error: error.message });
+  }
 };
