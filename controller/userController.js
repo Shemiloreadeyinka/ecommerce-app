@@ -23,46 +23,48 @@ exports.register = async (req, res) => {
         if (user) return res.status(400).json({ message: "user already exists" });
         const hashedPassword = await bcrypt.hash(password, 10)
 
-        let profilePicUrl = "https://pin.it/2FdE6irjV";
+        let profilePicUrl = "https://res.cloudinary.com/dwnqinmja/image/upload/v1756825319/profilepic_s4skl9.jpg";
 
         if (req.file) {
             const result = await cloudinary.uploader.upload(req.file.path, {
                 folder: 'uploads',
             });
-            await fs.unlink(req.file.path);
             profilePicUrl = result.secure_url;
+            await fs.unlink(req.file.path);
         }
 
         user = new User({ name, email, role, phoneNo, address, password: hashedPassword, pfp: profilePicUrl })
         await user.save()
         const { password: _, ...userData } = user.toObject();
 
-        return res.status(201).json({ message: "user successfully registered", user: userData })
+        return res.status(201).json({ message: "user successfully registered", user: userData  });
     } catch (error) {
         return res.status(500).json({ message: `Error saving user: ${error.message}` });
     }
 
 }
 exports.login = async (req, res) => {
-    const { email, password } = req.body
-    try {
-        const user = await User.findOne({ email })
-        if (!user) return res.status(400).json({ message: "user doesn't exist" })
-        const isMatch = await bcrypt.compare(password, user.password)
-        if (!isMatch) return res.status(400).json({ message: "password is incorrect" })
+  const { email, password } = req.body
+  try {
+    const user = await User.findOne({ email })
+    if (!user) return res.status(400).json({ message: "user doesn't exist" })
+    const isMatch = await bcrypt.compare(password, user.password)
+    if (!isMatch) return res.status(400).json({ message: "password is incorrect" })
 
-        const token = jwt.sign(
-            { id: user._id },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
 
-        )
-        res.cookie('token', token, { httpOnly: true })
-        return res.status(200).json({ message: 'login successful', user })
-    } catch (error) {
-        return res.status(500).json({ error: error.message })
+    )
+    res.cookie('token', token, { httpOnly: true })
+    const { password: _, ...userData } = user.toObject();
 
-    }
+    return res.status(200).json({ message: 'login successful', userData })
+  } catch (error) {
+    return res.status(500).json({ error: error.message })
+
+  }
 }
 exports.getOneUser = async (req, res) => {
     const { id } = req.params
@@ -80,8 +82,11 @@ exports.getOneUser = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
     try {
         const users = await User.find().populate('orders').populate('cart')
-
-        return res.status(200).json({ message: 'successful', users })
+       const newusers= users.map(user => {
+              const { password: _, ...userData } = user.toObject()
+              return userData
+        })
+        return res.status(200).json({ message: 'successful', users: newusers })
     } catch (error) {
         return res.status(500).json({ error: `error in getting all users${error.message}` })
     }

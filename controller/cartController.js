@@ -1,22 +1,24 @@
 const Cart = require('../models/cartModel')
 const Product = require('../models/productModel')
 const Order = require('../models/ordersModel');
+const User = require('../models/userModel');
 
 
 exports.addProductToCart = async (req, res) => {
     const { id } = req.user
     const { productid, quantity } = req.body
+    console.log(req.body)
     try {
         if (!productid) return res.send('product id required')
         const product = await Product.findById(productid)
         if (!product) return res.status(400).json({ message: "product doesn't exist" })
         const price = product.price
-        let cart = await Cart.findOne({user: id })
+        let cart = await Cart.findOne({ user: id })
         if (!cart) {
-             cart = new Cart({
-                user:id,
+            cart = new Cart({
+                user: id,
                 products: [{
-                    product:productid,
+                    productid: productid,
                     quantity: quantity || 1,
                     unitPrice: price,
                     totalPrice: price * (quantity || 1)
@@ -24,14 +26,14 @@ exports.addProductToCart = async (req, res) => {
             });
         }
         else {
-            const productIndex = cart.products.findIndex(p => p.product.toString() === productid);
+            const productIndex = cart.products.findIndex(p => p.productid.toString() === productid);
 
             if (productIndex > -1) {
 
-cart.products[productIndex].quantity += quantity||1;
+                cart.products[productIndex].quantity += quantity || 1;
                 cart.products[productIndex].totalPrice = price * cart.products[productIndex].quantity;
             } else {
-                cart.products.push({ product:productid, quantity: quantity || 1,unitPrice: price,totalPrice: price * (quantity || 1)});
+                cart.products.push({ productid: productid, quantity: quantity || 1, unitPrice: price, totalPrice: price * (quantity || 1) });
             }
         }
         await cart.save()
@@ -43,20 +45,24 @@ cart.products[productIndex].quantity += quantity||1;
 }
 
 exports.removeProductFromCart = async (req, res) => {
-    const { id } = req.user
-    const { productid } = req.params
+    const { id } = req.user;
+    const { productid } = req.params;
+
     try {
-        if (!productid) return res.status(400).json({ message: "input product id please" })
+        if (!productid) {
+            return res.status(400).json({ message: "Input product id please" });
+        }
 
-        let cart = await Cart.findOne({ user: id })
-        if (!cart) return res.status(404).json({ message: "User has no cart" })
+        let cart = await Cart.findOne({ user: id });
+        if (!cart) {
+            return res.status(404).json({ message: "User has no cart" });
+        }
 
-        const productIndex = cart.products.findIndex(
-            (p) => {
-                const prodId = p.product._id ? p.product._id : p.product;
-                return prodId.toString() === productid
-            }
-        );
+        // Remove the product completely
+        const productIndex = cart.products.findIndex((p) => {
+            const prodId = p._id || p.productid;
+            return prodId.toString() === productid;
+        });
 
         if (productIndex === -1) {
             return res.status(404).json({ message: "Product not found in cart" });
@@ -65,20 +71,27 @@ exports.removeProductFromCart = async (req, res) => {
         cart.products.splice(productIndex, 1);
 
         await cart.save();
+        await cart.populate({ path: "products.productid", select: 'name SKU category', populate: { path: "category", select: '-_id name' } });
 
-        res.json({ message: "Product removed from cart", cart });
-
+        res.status(200).json({
+            success: true,
+            message: "Product removed from cart",
+            cart,
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
     }
-}
+};
+
 
 
 exports.GetUserCart = async (req, res) => {
     const { id } = req.user
     try {
-        const cart = await Cart.findOne({ user: id }).populate('user', 'name').populate('products.product', 'name productid')
+        const cart = await Cart.findOne({ user: id }).populate('user', 'name').populate({
+            path: 'products.productid', select: '-_id name category', populate: { path: 'category', select: '-_id name' }
+        });
         if (!cart) return res.status(404).json({ message: "user has no cart" })
         return res.status(200).json({ cart })
     } catch (error) {
@@ -92,14 +105,14 @@ exports.clearCart = async (req, res) => {
 
     try {
         const cart = await Cart.findOne({ user: id });
-        if (!cart) return res.status(404).json({  message: 'Cart not found' });
+        if (!cart) return res.status(404).json({ message: 'Cart not found' });
 
         cart.products = [];
         await cart.save();
 
         return res.status(200).json({ message: 'Cart cleared', cart });
     } catch (error) {
-        return res.status(500).json({  error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
 
@@ -109,34 +122,38 @@ exports.checkoutCart = async (req, res) => {
     const { shippingAddress } = req.body;
 
     try {
-        const cart = await Cart.findOne({ user: id }).populate('products.product');
+        const cart = await Cart.findOne({ user: id })
+        const user = await User.findById(id);
         if (!cart || cart.products.length === 0) {
             return res.status(400).json({ success: false, message: 'Cart is empty' });
         }
 
-        // Calculate total amount
         const totalAmount = cart.products.reduce((total, item) => total + item.totalPrice, 0);
 
-        // Create order
+        const orderNumber = "ORD-" + Date.now();
         const order = new Order({
             user: id,
             products: cart.products.map(p => ({
-                product: p.product._id,
+                productid: p.productid,
                 quantity: p.quantity,
                 unitPrice: p.unitPrice,
                 totalPrice: p.totalPrice
             })),
             totalAmount,
+            orderNumber: orderNumber,
             status: 'Pending',
-            shippingAddress: shippingAddress || 'Not provided'
+            address: shippingAddress || 'Not provided'
         });
         await order.save();
+
+        await user.orders.push(order._id);
+        await user.save();
 
         cart.products = [];
         await cart.save();
 
-        return res.status(201).json({  message: 'Checkout successful', order });
+        return res.status(201).json({ message: 'Checkout successful', order });
     } catch (error) {
-        return res.status(500).json({  error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };

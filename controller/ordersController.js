@@ -3,40 +3,40 @@ const Cart = require('../models/cartModel');
 const { v4: uuidv4 } = require('uuid'); // for unique order numbers
 
 // CUSTOMER CONTROLLERS
-exports.createOrder = async (req, res) => {
-        const { address } = req.body;
-    try {
-        const cart = await Cart.findOne({ user: req.user.id }).populate('products.productid');
+// exports.createOrder = async (req, res) => {
+//         const { address } = req.body;
+//     try {
+//         const cart = await Cart.findOne({ user: req.user.id }).populate('products.productid');
 
-        if (!cart || cart.products.length === 0) {
-            return res.status(400).json({ message: 'Your cart is empty' });
-        }
+//         if (!cart || cart.products.length === 0) {
+//             return res.status(400).json({ message: 'Your cart is empty' });
+//         }
 
-        const totalAmount = cart.products.reduce((total, item) => {
-            return total + (item.productid.price * item.quantity);
-        }, 0) + (shippingFee || cart.shippingFee || 0);
+//         const totalAmount = cart.products.reduce((total, item) => {
+//             return total + (item.productid.price * item.quantity);
+//         }, 0) + (shippingFee || cart.shippingFee || 0);
 
 
-        const order = new Order({
-            user: req.user.id,
-            orderNumber: uuidv4().split('-')[0], // short unique id
-            address,
-            products : cart.products,
-            shippingFee,
-            totalAmount
-        });
+//         const order = new Order({
+//             user: req.user.id,
+//             orderNumber: uuidv4().split('-')[0], // short unique id
+//             address,
+//             products : cart.products,
+//             shippingFee,
+//             totalAmount
+//         });
 
-        await order.save();
-      return  res.status(201).json(order);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+//         await order.save();
+//       return  res.status(201).json(order);
+//     } catch (error) {
+//         res.status(500).json({ message: error.message });
+//     }
+// };
 
 exports.getMyOrders = async (req, res) => {
     const {id}= req.user
     try {
-        const orders = await Order.find({user: id}).populate('products.productid');
+        const orders = await Order.find({user: id})
       return  res.status(201).json({message:'successful',orders});
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -87,7 +87,7 @@ exports.trackOrder = async (req, res) => {
 //  ADMIN CONTROLLERS
 exports.getAllOrders = async (req, res) => {
     try {
-        const orders = await Order.find().populate('user').populate('products.productid');
+        const orders = await Order.find().populate('user',"-password").populate('products.productid');
        return res.status(200).json({message:'successful', orders});
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -95,10 +95,11 @@ exports.getAllOrders = async (req, res) => {
 };
 
 exports.getOrdersByUser = async (req, res) => {
-    const {id}= req.params
+    const {userid}= req.params
     try {
-        const orders = await Order.find({user:id })
-            .populate('products.productid');
+        console.log(userid)
+        const orders = await Order.find({user: userid}).populate('products.productid');
+        console.log(orders)
       return  res.status(200).json({message:'successful',orders});
     } catch (error) {
         res.status(500).json({ message: error.message });

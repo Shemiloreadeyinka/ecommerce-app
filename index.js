@@ -9,7 +9,9 @@ connectDB()
 const PORT= process.env.PORT || 3000;
 app.use(cookieParser())
 
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }))
 app.use('/users', require("./routes/userRoutes"))
 app.use('/cart', require("./routes/cartRoute"))
 app.use('/categories', require("./routes/categoryRoute"))

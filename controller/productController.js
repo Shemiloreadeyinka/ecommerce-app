@@ -3,7 +3,10 @@ const cloudinary = require('cloudinary').v2;
 const fs = require("fs/promises")
 
 
+
+
 const dotenv = require('dotenv');
+const { Console } = require("console");
 dotenv.config();
 
 cloudinary.config({
@@ -28,14 +31,14 @@ exports.addProduct = async (req, res) => {
     if (req.files && req.files.length > 0) {
       const results = await Promise.all(
         req.files.map(file =>
-          cloudinary.uploader.upload(file.path, { folder: 'uploads' })
+          cloudinary.uploader.upload(file.path, { folder: 'products' })
         )
       );
       await Promise.all(req.files.map(file => fs.unlink(file.path)));
 
       imageUrls = results.map(result => ({ url: result.secure_url, public_id: result.public_id }));
     } else {
-      imageUrls = [{ url: "https://via.placeholder.com/300x300.png?text=No+Image", public_id: "placeholder" }];
+      imageUrls = [{ url: "https://res.cloudinary.com/dwnqinmja/image/upload/v1756826094/cart_placeholder_jowfsp.png", public_id: "placeholder" }];
     }
 
 
@@ -106,9 +109,8 @@ exports.updateProduct = async (req, res) => {
 
 exports.removeProduct = async (req, res) => {
   try {
-    const { SKU } = req.params;
-    const product = await Product.findOneAndDelete({ SKU });
-
+    const { sku } = req.params;
+    const product = await Product.findOneAndDelete({ SKU: sku });
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -117,8 +119,33 @@ exports.removeProduct = async (req, res) => {
       product.image.map(img => cloudinary.uploader.destroy(img.public_id))
     );
 
-    return res.json({ message: "Product deleted successfully" });
+    return res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     return res.status(500).json({ message: "Error deleting product", error: error.message });
   }
 };
+
+exports.getProducts= async(req,res)=>{
+  try {
+    const products = await Product.find().populate('category', 'name');
+       if (!products || products.length === 0) {
+      return res.status(404).json({ message: "No products found" });
+    }
+    
+    return res.status(200).json({success:true, products });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching product", error: error.message });
+  }
+}
+exports.getProduct= async(req,res)=>{
+  const {sku}= req.params
+  try {
+    const product= await Product.findOne({SKU:sku})
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    return res.status(200).json({ success: true, product });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching product", error: error.message });
+  }
+}

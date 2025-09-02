@@ -1,13 +1,23 @@
 const Category = require('../models/categoryModel')
+const cloudinary = require('cloudinary').v2;
+const fs = require("fs/promises")
 
 exports.addCategory = async (req, res) => {
-    let { name, description, image } = req.body
-    name = name?.trim().toLowerCase()|| null
+    console.log(req.body)
+    let { name, description } = req.body
+        name = name?.trim().toLowerCase()|| null
     try {
         if (!name) return res.status(400).json({ message: "Name of category required" })
         let category = await Category.findOne({ name})
         if (category) return res.status(400).json({ message: "Category already exists" })
-        category = new Category({ name, description, image })
+            if (req.file) {
+                        const result = await cloudinary.uploader.upload(req.file.path, {
+                            folder: 'uploads',
+                        });
+                        await fs.unlink(req.file.path);
+                        profilePicUrl = result.secure_url;
+                    }
+        category = new Category({ name, description: description || "", image: profilePicUrl })
         await category.save()
         return res.status(201).json({ message: "category created successfully" })
 
